@@ -1,103 +1,103 @@
 # DECISIONS.md — FinanceCore SA
 
-Documentation of all data processing decisions made during the pipeline.
+Documentation de toutes les décisions de traitement des données prises durant le pipeline.
 
 ---
 
-## 🔁 Duplicates
+## 🔁 Doublons
 
-- **Detection:** Rows sharing the same `transaction_id` were identified.
-- **Decision:** Kept the **first occurrence**, removed all subsequent duplicates.
-- **Rationale:** The first recorded entry is assumed to be the original transaction; later entries are likely re-submissions or system errors.
+- **Détection :** Les lignes partageant le même `transaction_id` ont été identifiées.
+- **Décision :** Conservation de la **première occurrence**, suppression de toutes les suivantes.
+- **Justification :** La première entrée enregistrée est considérée comme la transaction d'origine ; les entrées ultérieures sont probablement des re-soumissions ou des erreurs système.
 
 ---
 
 ## 📅 Dates
 
-- **Issue:** `date_transaction` contained inconsistent or unparseable formats.
-- **Decision:** Converted to unified `datetime` format `YYYY-MM-DD HH:MM:SS` using `dayfirst=True`.
-- **Missing dates:** Imputed using the **mode** (most frequent date).
-- **Rationale:** Mode imputation is preferred over dropping rows to preserve transaction history.
+- **Problème :** `date_transaction` contenait des formats incohérents ou non parsables.
+- **Décision :** Conversion au format unifié `AAAA-MM-JJ HH:MM:SS` avec `dayfirst=True`.
+- **Valeurs manquantes :** Imputées par le **mode** (date la plus fréquente).
+- **Justification :** L'imputation par le mode est préférable à la suppression des lignes afin de préserver l'historique des transactions.
 
 ---
 
-## 💰 Amounts (`montant`)
+## 💰 Montants (`montant`)
 
-- **Issue:** Some values used a comma (`,`) as the decimal separator.
-- **Decision:** Replaced commas with periods and cast to `float`.
-- **Invalid values:** Coerced to `NaN` using `errors='coerce'`.
-- **Rationale:** Standardized numeric format required for all calculations.
-
----
-
-## 💶 Balance (`solde_avant`)
-
-- **Issue:** Values contained the suffix ` EUR` as a string.
-- **Decision:** Stripped the ` EUR` text and converted to `float`.
-- **Rationale:** Column must be numeric for any financial computation.
+- **Problème :** Certaines valeurs utilisaient une virgule (`,`) comme séparateur décimal.
+- **Décision :** Remplacement des virgules par des points et conversion en `float`.
+- **Valeurs invalides :** Converties en `NaN` via `errors='coerce'`.
+- **Justification :** Un format numérique standardisé est nécessaire pour tous les calculs.
 
 ---
 
-## 🔤 Text Fields
+## 💶 Solde (`solde_avant`)
 
-| Column | Transformation |
+- **Problème :** Les valeurs contenaient le suffixe ` EUR` sous forme de chaîne de caractères.
+- **Décision :** Suppression du texte ` EUR` et conversion en `float`.
+- **Justification :** La colonne doit être numérique pour tout calcul financier.
+
+---
+
+## 🔤 Champs Texte
+
+| Colonne | Transformation |
 |---|---|
-| `devise` | Uppercased and stripped |
-| `segment_client` | Capitalized (first letter) |
-| `agence` | Whitespace stripped |
+| `devise` | Mise en majuscules et suppression des espaces |
+| `segment_client` | Première lettre en majuscule |
+| `agence` | Suppression des espaces en début/fin |
 
-- **Rationale:** Ensures consistent grouping and joins; prevents duplicates due to casing or spacing.
+- **Justification :** Garantit des regroupements et des jointures cohérents ; évite les doublons dus à la casse ou aux espaces.
 
 ---
 
-## 🩹 Missing Values
+## 🩹 Valeurs Manquantes
 
-| Column | Method | Rationale |
+| Colonne | Méthode | Justification |
 |---|---|---|
-| `score_credit_client` | **Median** | Robust to outliers in a skewed score distribution |
-| `agence` | **Mode** | Most frequent branch is a safe default |
-| `segment_client` | **Mode** | Most common segment is a safe default |
-| `date_transaction` | **Mode** | Preserves rows while filling with the most typical date |
+| `score_credit_client` | **Médiane** | Robuste aux valeurs aberrantes dans une distribution asymétrique |
+| `agence` | **Mode** | L'agence la plus fréquente est une valeur par défaut sûre |
+| `segment_client` | **Mode** | Le segment le plus courant est une valeur par défaut sûre |
+| `date_transaction` | **Mode** | Préserve les lignes tout en remplissant avec la date la plus typique |
 
 ---
 
-## 🗑️ Dropped Columns
+## 🗑️ Colonnes Supprimées
 
-- **`taux_interet`:** Dropped entirely.
-- **Rationale:** Column had excessive missing values or was deemed irrelevant for downstream analysis.
-
----
-
-## ⚠️ Outlier Detection
-
-Three conditions flag a row as anomalous (`is_anomalie = True`):
-
-1. **`montant` IQR outlier:** Value falls below `Q1 − 1.5×IQR` or above `Q3 + 1.5×IQR`.
-2. **`score_credit_client` IQR outlier:** Same IQR rule applied to credit scores.
-3. **`score_credit_client` business rule:** Score outside the valid range `[0, 850]`.
-
-- **Decision:** Anomalies are **flagged, not removed**, to allow downstream teams to decide how to handle them.
-- **Rationale:** Preserving flagged rows avoids silent data loss and supports audit trails.
+- **`taux_interet` :** Supprimée entièrement.
+- **Justification :** Colonne avec trop de valeurs manquantes ou jugée non pertinente pour l'analyse en aval.
 
 ---
 
-## 🛠️ Feature Engineering
+## ⚠️ Détection des Valeurs Aberrantes
 
-| Feature | Logic | Purpose |
+Trois conditions marquent une ligne comme anormale (`is_anomalie = True`) :
+
+1. **`montant` hors IQR :** Valeur en dessous de `Q1 − 1,5×IQR` ou au-dessus de `Q3 + 1,5×IQR`.
+2. **`score_credit_client` hors IQR :** Même règle IQR appliquée aux scores de crédit.
+3. **Règle métier sur `score_credit_client` :** Score hors de l'intervalle valide `[0, 850]`.
+
+- **Décision :** Les anomalies sont **signalées, non supprimées**, afin de laisser les équipes en aval décider du traitement à appliquer.
+- **Justification :** Préserver les lignes signalées évite la perte silencieuse de données et facilite les audits.
+
+---
+
+## 🛠️ Ingénierie des Variables
+
+| Variable | Logique | Objectif |
 |---|---|---|
-| `annee`, `mois`, `trimestre`, `semaine-jour` | Extracted from `date_transaction` | Time-based trend analysis |
-| `montant_eur_verifie` | `montant / taux_change_eur` | Cross-validate reported `montant_eur` |
-| `categorie_risque` | Score ≥700 → Low; ≥580 → Medium; else → High | Risk segmentation |
-| `total_credit` / `total_debit` | Per-client sum by operation type | Client financial profile |
-| `solde_net` | `total_credit − total_debit` | Net position per client |
-| `nb_transaction` | Count of transactions per client | Activity level |
-| `montant_moyen` | Mean transaction amount per client | Average ticket size |
-| `nb_produit` | Distinct product count per client | Product diversity |
-| `taux_rejet` | % of rejected transactions per agency | Agency performance indicator |
+| `annee`, `mois`, `trimestre`, `semaine-jour` | Extraites de `date_transaction` | Analyse des tendances temporelles |
+| `montant_eur_verifie` | `montant / taux_change_eur` | Vérification croisée du `montant_eur` déclaré |
+| `categorie_risque` | Score ≥700 → Low ; ≥580 → Medium ; sinon → High | Segmentation par niveau de risque |
+| `total_credit` / `total_debit` | Somme par client et par type d'opération | Profil financier du client |
+| `solde_net` | `total_credit − total_debit` | Position nette par client |
+| `nb_transaction` | Nombre de transactions par client | Niveau d'activité |
+| `montant_moyen` | Montant moyen des transactions par client | Ticket moyen |
+| `nb_produit` | Nombre de produits distincts par client | Diversité produit |
+| `taux_rejet` | % de transactions rejetées par agence | Indicateur de performance agence |
 
 ---
 
 ## 📤 Export
 
-- Cleaned data exported to: `financecore_clean.csv`
-- Index column excluded (`index=False`) to avoid redundant row numbering.
+- Données nettoyées exportées dans : `financecore_clean.csv`
+- Colonne d'index exclue (`index=False`) pour éviter une numérotation redondante des lignes.
